@@ -1,0 +1,19 @@
+# Robots.txt for NozhaShop Pharmacy & Beauty Journal
+User-agent: *
+Allow: /
+Allow: /products/
+Allow: /categories/
+Allow: /brands/
+Allow: /blog/
+Allow: /shop
+Allow: /magazine
+
+# Disallow non-indexable transient routes and internal search query pages
+Disallow: /cart
+Disallow: /checkout
+Disallow: /search
+Disallow: /auth
+Disallow: /prescription
+Disallow: /api/
+
+Sitemap: https://nozhashop.com/sitemap.xml

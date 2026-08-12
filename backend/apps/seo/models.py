@@ -1,0 +1,3 @@
+from django.db import models
+class PageMeta(models.Model):
+    path=models.CharField(max_length=255, unique=True, db_index=True); title=models.CharField(max_length=255); description=models.TextField(); canonicalUrl=models.URLField(blank=True); robots=models.CharField(max_length=80, default='index, follow'); ogType=models.CharField(max_length=40, default='website'); ogImage=models.URLField(blank=True); ogTitle=models.CharField(max_length=255, blank=True); ogDescription=models.TextField(blank=True); twitterCard=models.CharField(max_length=40, default='summary_large_image'); schemaJson=models.JSONField(default=dict, blank=True)

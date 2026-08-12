@@ -1,0 +1,6 @@
+{
+  "name": "نوژاشاپ | NozhaShop",
+  "description": "Premium Persian Online Pharmacy & Health / Beauty Magazine",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
