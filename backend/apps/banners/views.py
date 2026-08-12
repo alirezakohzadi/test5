@@ -5,8 +5,4 @@ from .serializers import BannerSerializer
 class BannerList(generics.ListAPIView):
     serializer_class=BannerSerializer; pagination_class=None
     def get_queryset(self):
-        now=timezone.now(); q=Banner.objects.filter(is_active=True).filter(start_date__isnull=True)|Banner.objects.filter(is_active=True,start_date__lte=now); q=q.filter(end_date__isnull=True)|q.filter(end_date__gte=now); pos=self.request.query_params.get('position'); active=self.request.query_params.get('is_active');
-        if active is not None:
-            q=q.filter(is_active=active.lower() in ('1','true','yes'))
-        q=q.order_by('position','order','id')
-        return q.filter(position=pos) if pos else q
+        now=timezone.now(); q=Banner.objects.filter(is_active=True).filter(start_date__isnull=True)|Banner.objects.filter(is_active=True,start_date__lte=now); q=q.filter(end_date__isnull=True)|q.filter(end_date__gte=now); pos=self.request.query_params.get('position'); return q.filter(position=pos) if pos else q.order_by('position','order')
