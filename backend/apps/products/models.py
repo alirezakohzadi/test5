@@ -18,6 +18,15 @@ class Product(TimeStampedModel, SEOMetadataMixin):
     @property
     def discount_percentage(self):
         return round((self.price-self.discount_price)*100/self.price) if self.discount_price and self.price else 0
+    def clean(self):
+        super().clean()
+        if self.attributes is None:
+            self.attributes = {}
+
+    def save(self, *args, **kwargs):
+        if self.attributes is None:
+            self.attributes = {}
+        return super().save(*args, **kwargs)
     def __str__(self): return self.name
 class ProductImage(TimeStampedModel):
     product=models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE); image=models.ImageField(upload_to='products/original/', blank=True); original_url=models.URLField(blank=True); webp_image=models.ImageField(upload_to='products/webp/', blank=True); alt=models.CharField(max_length=255, blank=True); sort_order=models.PositiveIntegerField(default=0); is_primary=models.BooleanField(default=False, db_index=True); wordpress_attachment_id=models.BigIntegerField(null=True, blank=True, db_index=True)
