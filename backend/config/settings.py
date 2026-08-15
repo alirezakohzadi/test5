@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "apps.brands",
     "apps.products",
     "apps.banners",
+    "apps.homepage",
     "apps.navbar",
     "apps.blog",
     "apps.accounts",
@@ -167,7 +168,9 @@ CORS_ALLOWED_ORIGINS = config(
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
         "http://localhost:5173,"
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173,"
+        "http://localhost:3100,"
+        "http://127.0.0.1:3100"
     ),
     cast=Csv(),
 )
