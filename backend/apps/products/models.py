@@ -1,5 +1,6 @@
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator, MinValueValidator, MaxValueValidator
 from apps.common.models import TimeStampedModel, SEOMetadataMixin
 class Product(TimeStampedModel, SEOMetadataMixin):
     name=models.CharField(max_length=255, db_index=True); slug=models.SlugField(max_length=280, unique=True, db_index=True, allow_unicode=True)
@@ -29,5 +30,11 @@ class Product(TimeStampedModel, SEOMetadataMixin):
         return super().save(*args, **kwargs)
     def __str__(self): return self.name
 class ProductImage(TimeStampedModel):
-    product=models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE); image=models.ImageField(upload_to='products/original/', blank=True); original_url=models.URLField(blank=True); webp_image=models.ImageField(upload_to='products/webp/', blank=True); alt=models.CharField(max_length=255, blank=True); sort_order=models.PositiveIntegerField(default=0); is_primary=models.BooleanField(default=False, db_index=True); wordpress_attachment_id=models.BigIntegerField(null=True, blank=True, db_index=True)
+    product=models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE); image=models.ImageField(upload_to='products/gallery/', blank=True, validators=[FileExtensionValidator(['jpg','jpeg','png','webp'])]); original_url=models.URLField(blank=True); webp_image=models.ImageField(upload_to='products/webp/', blank=True); alt=models.CharField(max_length=255, blank=True); sort_order=models.PositiveIntegerField(default=0); is_primary=models.BooleanField(default=False, db_index=True); wordpress_attachment_id=models.BigIntegerField(null=True, blank=True, db_index=True)
+    def clean(self):
+        super().clean()
+        if self.image:
+            ext = self.image.name.rsplit('.', 1)[-1].lower()
+            if ext not in {'jpg', 'jpeg', 'png', 'webp'}:
+                raise ValidationError({'image': 'Only JPG, JPEG, PNG, and WEBP images are supported.'})
     class Meta: ordering=('sort_order','id'); indexes=[models.Index(fields=['product','is_primary','sort_order'])]

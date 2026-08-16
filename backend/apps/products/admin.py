@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import Product, ProductImage
 
@@ -17,7 +18,18 @@ class ProductAdminForm(forms.ModelForm):
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     extra = 0
-    fields = ("image", "original_url", "alt", "sort_order", "is_primary", "wordpress_attachment_id")
+    fields = ("preview", "image", "original_url", "alt", "sort_order", "is_primary", "wordpress_attachment_id")
+    readonly_fields = ("preview",)
+
+    def preview(self, obj):
+        url = ""
+        if obj and obj.image:
+            url = obj.image.url
+        elif obj and obj.original_url:
+            url = obj.original_url
+        if not url:
+            return "—"
+        return format_html('<img src="{}" style="height:60px;width:60px;object-fit:cover;border-radius:4px;" />', url)
 
 
 @admin.register(Product)
