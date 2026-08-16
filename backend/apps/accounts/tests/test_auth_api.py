@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 from django.contrib.auth.hashers import check_password
 from django.core.cache import cache
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.accounts.models import OTPCode, User
@@ -87,3 +88,64 @@ def test_payamak_success_failure_and_timeout(settings):
         assert PayamakOTPService().send_otp('09123456789', '123456')['status'] == 'sent'
     with patch('urllib.request.urlopen', side_effect=TimeoutError()):
         with pytest.raises(SMSDeliveryError): PayamakOTPService().send_otp('09123456789', '123456')
+
+
+AUTH_REQUIRED_REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+
+@override_settings(REST_FRAMEWORK=AUTH_REQUIRED_REST_FRAMEWORK)
+class AnonymousAuthenticationEndpointPermissionTests(TestCase):
+    def test_anonymous_register_does_not_require_jwt(self):
+        response = self.client.post(
+            "/api/v1/auth/register/",
+            {
+                "phone_number": "09121111111",
+                "password": "StrongPassword123!",
+                "password_confirm": "StrongPassword123!",
+            },
+            content_type="application/json",
+        )
+
+        self.assertNotEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 201)
+
+    def test_anonymous_login_does_not_require_jwt(self):
+        response = self.client.post(
+            "/api/v1/auth/login/",
+            {"phone_number": "09122222222", "password": "StrongPassword123!"},
+            content_type="application/json",
+        )
+
+        self.assertNotEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 400)
+
+    def test_anonymous_otp_send_does_not_require_jwt(self):
+        with patch("apps.accounts.views.create_and_send_otp") as mocked_create_and_send_otp:
+            response = self.client.post(
+                "/api/v1/auth/otp/send/",
+                {"phone_number": "09123333333"},
+                content_type="application/json",
+            )
+
+        self.assertNotEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 200)
+        mocked_create_and_send_otp.assert_called_once_with("09123333333")
+
+    def test_anonymous_otp_verify_does_not_require_jwt(self):
+        response = self.client.post(
+            "/api/v1/auth/otp/verify/",
+            {"phone_number": "09124444444", "code": "123456"},
+            content_type="application/json",
+        )
+
+        self.assertNotEqual(response.status_code, 401)
+        self.assertEqual(response.status_code, 400)
