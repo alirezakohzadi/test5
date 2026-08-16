@@ -276,6 +276,11 @@ SMS_PROVIDER = config(
     default="console",
 )
 
+PAYAMAK_USERNAME = config("PAYAMAK_USERNAME", default="")
+PAYAMAK_PASSWORD = config("PAYAMAK_PASSWORD", default="")
+PAYAMAK_API_KEY = config("PAYAMAK_API_KEY", default="")
+PAYAMAK_FROM = config("PAYAMAK_FROM", default="")
+
 PAYMENT_PROVIDER = config(
     "PAYMENT_PROVIDER",
     default="abstract",
@@ -314,4 +319,9 @@ TEMPLATES = [
 # Password Validation
 # ─────────────────────────────────────────────
 
-AUTH_PASSWORD_VALIDATORS = []
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
