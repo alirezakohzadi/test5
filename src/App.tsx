@@ -127,6 +127,8 @@ export default function App() {
     setCurrentUser(null);
     try {
       localStorage.removeItem('nozha_user_profile');
+      localStorage.removeItem('nozha_auth_token');
+      localStorage.removeItem('nozha_refresh_token');
     } catch {
       // Ignore
     }

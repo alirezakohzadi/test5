@@ -17,6 +17,8 @@ import {
   MapPin,
   ChevronLeft,
 } from 'lucide-react';
+import { ApiError } from '../services/apiClient';
+import { AuthTokenResponse, authService, isValidIranianMobile, normalizeIranianMobile } from '../services/authService';
 
 export interface UserProfile {
   name: string;
@@ -55,9 +57,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [otpCode, setOtpCode] = useState<string>('');
   const [timer, setTimer] = useState<number>(60);
   const [isTimerActive, setIsTimerActive] = useState<boolean>(false);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (isTimerActive && timer > 0) {
       interval = setInterval(() => {
         setTimer((prev) => prev - 1);
@@ -72,34 +76,101 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSendOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone || phone.length < 10) {
+  const getAuthErrorMessage = (error: unknown): string => {
+    if (error instanceof ApiError) {
+      if (error.status === 429) {
+        return 'تعداد درخواست‌های ارسال کد زیاد است. لطفاً کمی بعد دوباره تلاش کنید.';
+      }
+      if (error.status === 503) {
+        return 'در حال حاضر امکان ارسال پیامک وجود ندارد. لطفاً چند دقیقه دیگر تلاش کنید.';
+      }
+      if (error.status === 400) {
+        return error.message || 'شماره موبایل واردشده معتبر نیست.';
+      }
+      return error.message || 'ارسال کد تایید ناموفق بود.';
+    }
+
+    return 'ارتباط با سرور برقرار نشد. لطفاً اتصال اینترنت خود را بررسی کنید.';
+  };
+
+  const requestOtp = async () => {
+    if (isSendingOtp) return;
+
+    const normalizedPhone = normalizeIranianMobile(phone);
+    if (!isValidIranianMobile(normalizedPhone)) {
       onShowToast('خطای شماره همراه', 'لطفاً یک شماره موبایل معتبر (مثلاً ۰۹۱۲۳۴۵۶۷۸۹) وارد کنید.', 'warning');
       return;
     }
-    setOtpStep('code');
-    setTimer(60);
-    setIsTimerActive(true);
-    onShowToast('کد تایید ارسال شد', 'کد تایید ۴ رقمی آزمایشی «1234» به شماره شما پیامک شد.', 'info');
+
+    setIsSendingOtp(true);
+    try {
+      const response = await authService.sendOtp(normalizedPhone);
+      if (response.detail !== 'OTP sent') {
+        throw new Error('Unexpected OTP response');
+      }
+      setPhone(normalizedPhone);
+      setOtpStep('code');
+      setTimer(60);
+      setIsTimerActive(true);
+      onShowToast('کد تایید ارسال شد', 'کد تایید برای شماره شما پیامک شد.', 'info');
+    } catch (error) {
+      onShowToast('ارسال کد ناموفق بود', getAuthErrorMessage(error), 'warning');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (otpCode !== '1234' && otpCode.length < 4) {
-      onShowToast('کد اشتباه است', 'کد ورود آزمایشی 1234 می‌باشد.', 'warning');
+    void requestOtp();
+  };
+
+
+  const persistAuthTokens = (response: AuthTokenResponse) => {
+    try {
+      const accessToken = response.access_token || response.access;
+      const refreshToken = response.refresh_token || response.refresh;
+      if (accessToken) {
+        localStorage.setItem('nozha_auth_token', accessToken);
+      }
+      if (refreshToken) {
+        localStorage.setItem('nozha_refresh_token', refreshToken);
+      }
+    } catch {
+      // Ignore storage failures; the in-memory login state still updates.
+    }
+  };
+
+  const mapAuthResponseToUserProfile = (response: AuthTokenResponse): UserProfile => ({
+    name: response.user.name || 'کاربر عزیز نوژاشاپ',
+    phone: response.user.phone_number || response.user.phone || phone,
+    walletBalance: response.user.walletBalance || 0,
+    registeredDate: 'امروز',
+  });
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isVerifyingOtp) return;
+
+    const normalizedPhone = normalizeIranianMobile(phone);
+    if (!isValidIranianMobile(normalizedPhone) || !/^\d{6}$/.test(otpCode)) {
+      onShowToast('کد تایید نامعتبر است', 'شماره موبایل یا کد تایید واردشده معتبر نیست.', 'warning');
       return;
     }
-    const user: UserProfile = {
-      name: fullName || 'کاربر عزیز نوژاشاپ',
-      phone: phone,
-      walletBalance: 150000,
-      registeredDate: 'امروز',
-    };
-    onLoginSuccess(user);
-    onShowToast('ورود موفقیت‌آمیز', 'به داروخانه آنلاین نوژاشاپ خوش آمدید!', 'success');
-    resetForms();
-    onClose();
+
+    setIsVerifyingOtp(true);
+    try {
+      const response = await authService.verifyOtp(normalizedPhone, otpCode);
+      persistAuthTokens(response);
+      onLoginSuccess(mapAuthResponseToUserProfile(response));
+      onShowToast('ورود موفقیت‌آمیز', 'به داروخانه آنلاین نوژاشاپ خوش آمدید!', 'success');
+      resetForms();
+      onClose();
+    } catch (error) {
+      onShowToast('ورود ناموفق بود', getAuthErrorMessage(error), 'warning');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   const handlePasswordLogin = (e: React.FormEvent) => {
@@ -320,9 +391,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                       <button
                         type="submit"
-                        className="w-full h-11 rounded-xl bg-[#0D7366] hover:bg-[#0A584E] text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-2"
+                        disabled={isSendingOtp}
+                        className="w-full h-11 rounded-xl bg-[#0D7366] hover:bg-[#0A584E] disabled:cursor-not-allowed disabled:opacity-70 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-2"
                       >
-                        <span>دریافت کد تایید ورود</span>
+                        <span>{isSendingOtp ? 'در حال ارسال...' : 'دریافت کد تایید ورود'}</span>
                         <ArrowRight className="w-4 h-4 rotate-180" />
                       </button>
                     </form>
@@ -336,10 +408,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <div className="relative">
                           <input
                             type="text"
-                            placeholder="کد آزمایشی: 1234"
+                            placeholder="کد ۶ رقمی پیامک‌شده"
                             value={otpCode}
                             onChange={(e) => setOtpCode(e.target.value)}
-                            maxLength={4}
+                            maxLength={6}
                             className="w-full h-12 text-center text-xl tracking-widest font-mono font-bold rounded-xl border border-slate-200 focus:border-[#0D7366] text-slate-900 outline-none"
                             required
                           />
@@ -361,14 +433,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           ) : (
                             <button
                               type="button"
-                              onClick={() => {
-                                setTimer(60);
-                                setIsTimerActive(true);
-                                onShowToast('ارسال مجدد', 'کد جدید ارسال گردید (کد 1234).');
-                              }}
-                              className="text-[#0D7366] font-bold hover:underline"
+                              onClick={() => void requestOtp()}
+                              disabled={isSendingOtp}
+                              className="text-[#0D7366] font-bold hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                              ارسال مجدد کد
+                              {isSendingOtp ? 'در حال ارسال...' : 'ارسال مجدد کد'}
                             </button>
                           )}
                         </span>
@@ -376,9 +445,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                       <button
                         type="submit"
-                        className="w-full h-11 rounded-xl bg-[#0D7366] hover:bg-[#0A584E] text-white font-extrabold text-xs shadow-md transition-all"
+                        disabled={isVerifyingOtp}
+                        className="w-full h-11 rounded-xl bg-[#0D7366] hover:bg-[#0A584E] disabled:cursor-not-allowed disabled:opacity-70 text-white font-extrabold text-xs shadow-md transition-all"
                       >
-                        تایید و ورود به سیستم
+                        {isVerifyingOtp ? 'در حال بررسی...' : 'تایید و ورود به سیستم'}
                       </button>
                     </form>
                   )}
