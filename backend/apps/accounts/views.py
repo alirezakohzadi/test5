@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -20,6 +21,7 @@ def token_response(user):
     }
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def register(request):
     s = RegisterSerializer(data=request.data)
     s.is_valid(raise_exception=True)
@@ -31,6 +33,7 @@ def register(request):
     return Response(token_response(user), status=status.HTTP_201_CREATED)
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def login(request):
     s = LoginSerializer(data=request.data)
     s.is_valid(raise_exception=True)
@@ -45,6 +48,7 @@ def login(request):
     return Response(token_response(user))
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def otp_send(request):
     s = SendOTPSerializer(data=request.data)
     s.is_valid(raise_exception=True)
@@ -57,6 +61,7 @@ def otp_send(request):
     return Response({"detail": "OTP sent"})
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def otp_verify(request):
     s = VerifyOTPSerializer(data=request.data)
     s.is_valid(raise_exception=True)
